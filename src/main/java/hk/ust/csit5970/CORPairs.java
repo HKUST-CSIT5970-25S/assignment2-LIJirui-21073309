@@ -46,13 +46,26 @@ public class CORPairs extends Configured implements Tool {
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
-			HashMap<String, Integer> word_set = new HashMap<String, Integer>();
+			HashMap<String, Integer> wordCount = new HashMap<String, Integer>();
 			// Please use this tokenizer! DO NOT implement a tokenizer by yourself!
 			String clean_doc = value.toString().replaceAll("[^a-z A-Z]", " ");
 			StringTokenizer doc_tokenizer = new StringTokenizer(clean_doc);
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			while (doc_tokenizer.hasMoreTokens()) {
+                String token = doc_tokenizer.nextToken().toLowerCase();
+                // Count each occurrence
+                if (wordCount.containsKey(token)) {
+                    wordCount.put(token, wordCount.get(token) + 1);
+                } else {
+                    wordCount.put(token, 1);
+                }
+            }
+            // Emit each word with its count from this line.
+            for (Map.Entry<String, Integer> entry : wordCount.entrySet()) {
+                context.write(new Text(entry.getKey()), new IntWritable(entry.getValue()));
+            }
 		}
 	}
 
@@ -66,6 +79,11 @@ public class CORPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			int sum = 0;
+            for (IntWritable val : values) {
+                sum += val.get();
+            }
+            context.write(key, new IntWritable(sum));
 		}
 	}
 
@@ -81,6 +99,23 @@ public class CORPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			String line = value.toString();
+			Set<String> uniqueWords = new TreeSet<String>();
+            while (doc_tokenizer.hasMoreTokens()) {
+                String token = doc_tokenizer.nextToken().toLowerCase();
+                if (!token.isEmpty()) {
+                    uniqueWords.add(token);
+                }
+            }
+            // Convert to a list to generate all unique pairs (A, B) with A < B.
+            List<String> wordsList = new ArrayList<String>(uniqueWords);
+            int n = wordsList.size();
+            for (int i = 0; i < n; i++) {
+                for (int j = i + 1; j < n; j++) {
+                    PairOfStrings pair = new PairOfStrings(wordsList.get(i), wordsList.get(j));
+                    context.write(pair, new IntWritable(1));
+                }
+            }
 		}
 	}
 
@@ -93,6 +128,11 @@ public class CORPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			int sum = 0;
+            for (IntWritable val : values) {
+                sum += val.get();
+            }
+            context.write(key, new IntWritable(sum));
 		}
 	}
 
@@ -145,6 +185,19 @@ public class CORPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			int pairCount = 0;
+            for (IntWritable val : values) {
+                pairCount += val.get();
+            }
+            String wordA = key.getLeftElement();
+            String wordB = key.getRightElement();
+            Integer freqA = word_total_map.get(wordA);
+            Integer freqB = word_total_map.get(wordB);
+            if (freqA == null || freqB == null || freqA == 0 || freqB == 0) {
+                return;
+            }
+            double correlation = (double) pairCount / (freqA * freqB);
+            context.write(key, new DoubleWritable(correlation));
 		}
 	}
 

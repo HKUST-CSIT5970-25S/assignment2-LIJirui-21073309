@@ -53,14 +53,33 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			if(words.length < 2) 
+				return; 
+			for (int i = 0; i < words.length - 1; i++) {
+				String word1 = words[i].replaceAll("[^a-zA-Z']", "")
+									 .replaceAll("'+$", "")
+									 .replaceAll("^'+", "");
+				String word2 = words[i+1].replaceAll("[^a-zA-Z']", "")
+										.replaceAll("'+$", "")
+										.replaceAll("^'+", "");
+				
+				if (!word1.isEmpty() && !word2.isEmpty()) {
+					BIGRAM.set(word1, word2);
+					context.write(BIGRAM, ONE);
+					
+					BIGRAM.set(word1, "*");
+					context.write(BIGRAM, ONE);
+				}
+			}
 		}
 	}
 
 	/*
 	 * TODO: Write your reducer here.
 	 */
-	private static class MyReducer extends
-			Reducer<PairOfStrings, IntWritable, PairOfStrings, FloatWritable> {
+	private static class MyReducer extends Reducer<PairOfStrings, IntWritable, PairOfStrings, FloatWritable> {
+		private String currentLeft = null;
+		private int currentSum = 0;
 
 		// Reuse objects.
 		private final static FloatWritable VALUE = new FloatWritable();
@@ -68,9 +87,35 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 		@Override
 		public void reduce(PairOfStrings key, Iterable<IntWritable> values,
 				Context context) throws IOException, InterruptedException {
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+			String left = key.getLeftElement();
+			String right = key.getRightElement();
+			if (!left.equals(currentLeft)) {
+				currentLeft = left;
+				currentSum = 0;
+			}
+
+			if (right.equals("*")) {
+				int sum = 0;
+				for (IntWritable val : values) {
+					sum += val.get();
+				}
+				currentSum = sum;
+				PairOfStrings outputKey = new PairOfStrings(left, "");
+				VALUE.set(currentSum);
+				context.write(outputKey, VALUE);
+			} else {
+				if (currentSum == 0) {
+					LOG.error("No sum found for left element: " + left);
+					return;
+				}
+				int count = 0;
+				for (IntWritable val : values) {
+					count += val.get();
+				}
+				float freq = (float) count / currentSum;
+				VALUE.set(freq);
+				context.write(key, VALUE);
+			}
 		}
 	}
 	
@@ -84,6 +129,12 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			int sum = 0;
+			for (IntWritable value : values) {
+				sum += value.get();
+			}
+			SUM.set(sum);
+			context.write(key, SUM);
 		}
 	}
 
