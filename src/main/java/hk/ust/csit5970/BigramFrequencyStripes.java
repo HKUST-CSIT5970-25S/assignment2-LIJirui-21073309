@@ -54,16 +54,14 @@ public class BigramFrequencyStripes extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			// 如果单词数量少于2，直接返回
 			if(words.length < 2) 
 				return; 
             for (int i = 0; i < words.length - 1; i++) {
-                String currentWord = words[i].replaceAll("[^a-zA-Z']", "")
-                                            .replaceAll("^'+", "")
-                                            .replaceAll("'+$", "");
-                String nextWord = words[i + 1].replaceAll("[^a-zA-Z']", "")
-                                              .replaceAll("^'+", "")
-                                              .replaceAll("'+$", "");
+                String currentWord = cleanWord(words[i]);
+                String nextWord = cleanWord(words[i + 1]);
 
+				// 如果当前单词或下一个单词为空，继续下一次循环
                 if (currentWord.isEmpty() || nextWord.isEmpty()) {
                     continue;
                 }
@@ -73,6 +71,13 @@ public class BigramFrequencyStripes extends Configured implements Tool {
                 STRIPE.put(nextWord, 1);
                 context.write(KEY, STRIPE);
             }
+		}
+
+		// 清理单词，去除不必要的字符
+		private String cleanWord(String word) {
+			return word.replaceAll("[^a-zA-Z']", "")
+					.replaceAll("^'+", "")
+					.replaceAll("'+$", "");
 		}
 	}
 
@@ -94,8 +99,10 @@ public class BigramFrequencyStripes extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			// 清空总条纹
 			SUM_STRIPES.clear();
 
+			// 汇总所有条纹
             for (HashMapStringIntWritable stripe : stripes) {
                 for (Map.Entry<String, Integer> entry : stripe.entrySet()) {
                     String b = entry.getKey();
@@ -105,20 +112,20 @@ public class BigramFrequencyStripes extends Configured implements Tool {
             }
 
             int sumTotal = 0;
+			// 计算总计数
             for (Map.Entry<String, Integer> entry : SUM_STRIPES.entrySet()) {
                 sumTotal += entry.getValue();
             }
-
             if (sumTotal == 0) {
                 return;
             }
 
-            // Emit total count for the current word
+			// 输出当前单词的总计数
             BIGRAM.set(key.toString(), "");
             FREQ.set(sumTotal);
             context.write(BIGRAM, FREQ);
 
-            // Emit each bigram and its relative frequency
+			// 输出每个二元组及其相对频率
             for (Map.Entry<String, Integer> entry : SUM_STRIPES.entrySet()) {
                 String b = entry.getKey();
                 int count = entry.getValue();
@@ -147,8 +154,10 @@ public class BigramFrequencyStripes extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			// 清空总条纹
 			SUM_STRIPES.clear();
 
+			// 汇总所有条纹
             for (HashMapStringIntWritable stripe : stripes) {
                 for (Map.Entry<String, Integer> entry : stripe.entrySet()) {
                     String b = entry.getKey();
@@ -157,6 +166,7 @@ public class BigramFrequencyStripes extends Configured implements Tool {
                 }
             }
 
+			// 输出合并后的条纹
             HashMapStringIntWritable outStripe = new HashMapStringIntWritable();
 			outStripe.putAll(SUM_STRIPES);
 			context.write(key, outStripe);

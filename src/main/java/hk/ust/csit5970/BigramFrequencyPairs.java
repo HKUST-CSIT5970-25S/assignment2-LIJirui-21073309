@@ -53,15 +53,12 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
+			// 如果单词数量小于2，直接返回
 			if(words.length < 2) 
 				return; 
 			for (int i = 0; i < words.length - 1; i++) {
-				String word1 = words[i].replaceAll("[^a-zA-Z']", "")
-									 .replaceAll("'+$", "")
-									 .replaceAll("^'+", "");
-				String word2 = words[i+1].replaceAll("[^a-zA-Z']", "")
-										.replaceAll("'+$", "")
-										.replaceAll("^'+", "");
+				String word1 = cleanWord(words[i]);
+				String word2 = cleanWord(words[i + 1]);
 				
 				if (!word1.isEmpty() && !word2.isEmpty()) {
 					BIGRAM.set(word1, word2);
@@ -72,6 +69,14 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 				}
 			}
 		}
+
+		// 清理单词，去除不必要的字符
+		private String cleanWord(String word) {
+			return word.replaceAll("[^a-zA-Z']", "")
+					.replaceAll("'+$", "")
+					.replaceAll("^'+", "");
+		}
+
 	}
 
 	/*
@@ -89,11 +94,14 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 				Context context) throws IOException, InterruptedException {
 			String left = key.getLeftElement();
 			String right = key.getRightElement();
+
+			// 如果当前左侧元素与之前不同，重置当前总和
 			if (!left.equals(currentLeft)) {
 				currentLeft = left;
 				currentSum = 0;
 			}
 
+			// 处理右侧元素为 "*" 的情况
 			if (right.equals("*")) {
 				int sum = 0;
 				for (IntWritable val : values) {
@@ -104,8 +112,9 @@ public class BigramFrequencyPairs extends Configured implements Tool {
 				VALUE.set(currentSum);
 				context.write(outputKey, VALUE);
 			} else {
+				// 如果没有找到当前左侧元素的总和，记录错误
 				if (currentSum == 0) {
-					LOG.error("No sum found for left element: " + left);
+					LOG.error("未找到左侧元素的总和: " + left);
 					return;
 				}
 				int count = 0;

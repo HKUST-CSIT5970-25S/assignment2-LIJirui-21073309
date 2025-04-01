@@ -38,25 +38,28 @@ public class CORStripes extends Configured implements Tool {
 				throws IOException, InterruptedException {
 			HashMap<String, Integer> wordCount = new HashMap<String, Integer>();
 			// Please use this tokenizer! DO NOT implement a tokenizer by yourself!
+			// 使用指定的分词器，清理文档
 			String clean_doc = value.toString().replaceAll("[^a-z A-Z]", " ");
 			StringTokenizer doc_tokenizer = new StringTokenizer(clean_doc);
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+
+			// 统计每个单词的出现次数
 			while (doc_tokenizer.hasMoreTokens()) {
-                // Convert tokens to lowercase.
                 String token = doc_tokenizer.nextToken().toLowerCase();
-                if (token.isEmpty()) continue;
-                if (wordCount.containsKey(token)) {
-                    wordCount.put(token, wordCount.get(token) + 1);
-                } else {
-                    wordCount.put(token, 1);
-                }
+				if (!token.isEmpty()) {
+					// 更新计数
+					if (wordCount.containsKey(token)) {
+						wordCount.put(token, wordCount.get(token) + 1);
+					} else {
+						wordCount.put(token, 1);
+					}
+				}
             }
-            // Emit each word and its count for the line.
-            for (Map.Entry<String, Integer> entry : wordCount.entrySet()) {
-                context.write(new Text(entry.getKey()), new IntWritable(entry.getValue()));
-            }
+
+			// 输出每个单词及其计数
+			for (Iterator<Map.Entry<String, Integer>> it = wordCount.entrySet().iterator(); it.hasNext();) {
+				Map.Entry<String, Integer> entry = it.next();
+				context.write(new Text(entry.getKey()), new IntWritable(entry.getValue()));
+			}
 		}
 	}
 
@@ -67,13 +70,12 @@ public class CORStripes extends Configured implements Tool {
 			Reducer<Text, IntWritable, Text, IntWritable> {
 		@Override
 		public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+			// 计算总和
 			int sum = 0;
-            for (IntWritable val : values) {
-                sum += val.get();
-            }
+			for (Iterator<IntWritable> it = values.iterator(); it.hasNext();) {
+				sum += it.next().get();
+			}
+			// 输出结果
             context.write(key, new IntWritable(sum));
 		}
 	}
@@ -88,22 +90,21 @@ public class CORStripes extends Configured implements Tool {
 			// Please use this tokenizer! DO NOT implement a tokenizer by yourself!
 			String doc_clean = value.toString().replaceAll("[^a-z A-Z]", " ");
 			StringTokenizer doc_tokenizers = new StringTokenizer(doc_clean);
+			// 收集唯一单词
 			while (doc_tokenizers.hasMoreTokens()) {
 				sorted_word_set.add(doc_tokenizers.nextToken());
 			}
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+
 			List<String> wordsList = new ArrayList<String>(sorted_word_set);
             int n = wordsList.size();
-            // For each word A, emit a stripe with counts for each word B that comes after A.
+			// 对于每个单词 A，发出一个包含 A 后每个单词 B 的计数的条纹
             for (int i = 0; i < n; i++) {
                 String wordA = wordsList.get(i);
                 MapWritable stripe = new MapWritable();
                 for (int j = i + 1; j < n; j++) {
                     String wordB = wordsList.get(j);
                     Text bText = new Text(wordB);
-                    // Initialize or increment count for wordB.
+					// 初始化或增加 wordB 的计数
                     if (stripe.containsKey(bText)) {
                         IntWritable count = (IntWritable) stripe.get(bText);
                         count.set(count.get() + 1);
@@ -111,6 +112,7 @@ public class CORStripes extends Configured implements Tool {
                         stripe.put(bText, new IntWritable(1));
                     }
                 }
+				// 如果条纹不为空，则输出
                 if (!stripe.isEmpty()) {
                     context.write(new Text(wordA), stripe);
                 }
@@ -160,31 +162,26 @@ public class CORStripes extends Configured implements Tool {
 		protected void setup(Context context) throws IOException, InterruptedException {
 			Path middle_result_path = new Path("mid/part-r-00000");
 			Configuration middle_conf = new Configuration();
-			try {
-				FileSystem fs = FileSystem.get(URI.create(middle_result_path.toString()), middle_conf);
 
-				if (!fs.exists(middle_result_path)) {
-					throw new IOException(middle_result_path.toString() + "not exist!");
-				}
+			FileSystem fs = FileSystem.get(URI.create(middle_result_path.toString()), middle_conf);
 
-				FSDataInputStream in = fs.open(middle_result_path);
-				InputStreamReader inStream = new InputStreamReader(in);
-				BufferedReader reader = new BufferedReader(inStream);
-
-				LOG.info("reading...");
-				String line = reader.readLine();
-				String[] line_terms;
-				while (line != null) {
-					line_terms = line.split("\t");
-					word_total_map.put(line_terms[0], Integer.valueOf(line_terms[1]));
-					LOG.info("read one line!");
-					line = reader.readLine();
-				}
-				reader.close();
-				LOG.info("finished！");
-			} catch (Exception e) {
-				System.out.println(e.getMessage());
+			if (!fs.exists(middle_result_path)) {
+				throw new IOException(middle_result_path.toString() + "文件不存在t!");
 			}
+
+			FSDataInputStream in = fs.open(middle_result_path);
+			InputStreamReader inStream = new InputStreamReader(in);
+			BufferedReader reader = new BufferedReader(inStream);
+
+			LOG.info("开始读取...");
+			String line;
+			while ((line = reader.readLine()) != null) {
+				String[] line_terms = line.split("\t");
+				word_total_map.put(line_terms[0], Integer.valueOf(line_terms[1]));
+				LOG.info("读取一行!");
+			}
+			reader.close();
+			LOG.info("完成");
 		}
 
 		/*
@@ -195,7 +192,7 @@ public class CORStripes extends Configured implements Tool {
 			/*
 			 * TODO: Your implementation goes here.
 			 */
-			// Aggregate all stripes for the key (word A)
+			// 聚合所有与键（词 A）相关的条带
             MapWritable combinedStripe = new MapWritable();
             for (MapWritable stripe : values) {
                 for (Writable mapKey : stripe.keySet()) {
@@ -208,7 +205,7 @@ public class CORStripes extends Configured implements Tool {
                     }
                 }
             }
-            // For each word B in the aggregated stripe, compute the correlation coefficient.
+			// 对于聚合条带中的每个词 B，计算相关系数
             Integer freqAObj = word_total_map.get(key.toString());
 			if (freqAObj == null) {
 				return;
@@ -217,7 +214,7 @@ public class CORStripes extends Configured implements Tool {
 
             for (Writable mapKey : combinedStripe.keySet()) {
                 String wordB = mapKey.toString();
-                // Ensure that we output only pairs with A < B.
+				// 确保只输出 A < B 的对
                 if (key.toString().compareTo(wordB) < 0) {
                     int freqB = word_total_map.containsKey(wordB) ? word_total_map.get(wordB) : 0;
                     if (freqA != 0 && freqB != 0) {

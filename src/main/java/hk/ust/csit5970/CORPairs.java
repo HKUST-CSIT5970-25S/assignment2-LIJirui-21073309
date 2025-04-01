@@ -47,42 +47,42 @@ public class CORPairs extends Configured implements Tool {
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
 			HashMap<String, Integer> wordCount = new HashMap<String, Integer>();
-			// Please use this tokenizer! DO NOT implement a tokenizer by yourself!
+
+			// 使用指定的分词器，清理文档
 			String clean_doc = value.toString().replaceAll("[^a-z A-Z]", " ");
 			StringTokenizer doc_tokenizer = new StringTokenizer(clean_doc);
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+
+			// 统计每个单词的出现次数
 			while (doc_tokenizer.hasMoreTokens()) {
                 String token = doc_tokenizer.nextToken().toLowerCase();
-                // Count each occurrence
+				// 更新计数
                 if (wordCount.containsKey(token)) {
                     wordCount.put(token, wordCount.get(token) + 1);
                 } else {
                     wordCount.put(token, 1);
                 }
             }
-            // Emit each word with its count from this line.
-            for (Map.Entry<String, Integer> entry : wordCount.entrySet()) {
-                context.write(new Text(entry.getKey()), new IntWritable(entry.getValue()));
-            }
+
+			// 输出每个单词及其计数
+			for (Iterator<Map.Entry<String, Integer>> it = wordCount.entrySet().iterator(); it.hasNext();) {
+				Map.Entry<String, Integer> entry = it.next();
+				context.write(new Text(entry.getKey()), new IntWritable(entry.getValue()));
+			}
 		}
 	}
 
 	/*
 	 * TODO: Write your first-pass reducer here.
 	 */
-	private static class CORReducer1 extends
-			Reducer<Text, IntWritable, Text, IntWritable> {
+	private static class CORReducer1 extends Reducer<Text, IntWritable, Text, IntWritable> {
 		@Override
 		public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+			// 计算总和
 			int sum = 0;
-            for (IntWritable val : values) {
-                sum += val.get();
-            }
+			for (Iterator<IntWritable> it = values.iterator(); it.hasNext();) {
+				sum += it.next().get();
+			}
+			//输出结果
             context.write(key, new IntWritable(sum));
 		}
 	}
@@ -96,9 +96,8 @@ public class CORPairs extends Configured implements Tool {
 		protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
 			// Please use this tokenizer! DO NOT implement a tokenizer by yourself!
 			StringTokenizer doc_tokenizer = new StringTokenizer(value.toString().replaceAll("[^a-z A-Z]", " "));
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+
+			// 存储唯一单词
 			String line = value.toString();
 			Set<String> uniqueWords = new TreeSet<String>();
             while (doc_tokenizer.hasMoreTokens()) {
@@ -107,7 +106,8 @@ public class CORPairs extends Configured implements Tool {
                     uniqueWords.add(token);
                 }
             }
-            // Convert to a list to generate all unique pairs (A, B) with A < B.
+
+			// 将唯一单词转换为数组以生成所有唯一对 (A, B) 其中 A < B
             List<String> wordsList = new ArrayList<String>(uniqueWords);
             int n = wordsList.size();
             for (int i = 0; i < n; i++) {
@@ -125,13 +125,12 @@ public class CORPairs extends Configured implements Tool {
 	private static class CORPairsCombiner2 extends Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable> {
 		@Override
 		protected void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-			/*
-			 * TODO: Your implementation goes here.
-			 */
+			// 计算总和
 			int sum = 0;
-            for (IntWritable val : values) {
-                sum += val.get();
-            }
+			for (Iterator<IntWritable> it = values.iterator(); it.hasNext();) {
+				sum += it.next().get();
+			}
+			// 输出结果
             context.write(key, new IntWritable(sum));
 		}
 	}
@@ -150,31 +149,25 @@ public class CORPairs extends Configured implements Tool {
 		protected void setup(Context context) throws IOException, InterruptedException {
 			Path middle_result_path = new Path("mid/part-r-00000");
 			Configuration middle_conf = new Configuration();
-			try {
-				FileSystem fs = FileSystem.get(URI.create(middle_result_path.toString()), middle_conf);
+			FileSystem fs = FileSystem.get(URI.create(middle_result_path.toString()), middle_conf);
 
-				if (!fs.exists(middle_result_path)) {
-					throw new IOException(middle_result_path.toString() + "not exist!");
-				}
-
-				FSDataInputStream in = fs.open(middle_result_path);
-				InputStreamReader inStream = new InputStreamReader(in);
-				BufferedReader reader = new BufferedReader(inStream);
-
-				LOG.info("reading...");
-				String line = reader.readLine();
-				String[] line_terms;
-				while (line != null) {
-					line_terms = line.split("\t");
-					word_total_map.put(line_terms[0], Integer.valueOf(line_terms[1]));
-					LOG.info("read one line!");
-					line = reader.readLine();
-				}
-				reader.close();
-				LOG.info("finished！");
-			} catch (Exception e) {
-				System.out.println(e.getMessage());
+			if (!fs.exists(middle_result_path)) {
+				throw new IOException(middle_result_path.toString() + "文件不存在!");
 			}
+
+			FSDataInputStream in = fs.open(middle_result_path);
+			InputStreamReader inStream = new InputStreamReader(in);
+			BufferedReader reader = new BufferedReader(inStream);
+
+			LOG.info("开始读取...");
+			String line;
+			while ((line = reader.readLine()) != null) {
+				String[] line_terms = line.split("\t");
+				word_total_map.put(line_terms[0], Integer.valueOf(line_terms[1]));
+				LOG.info("完成一行!");
+			}
+			reader.close();
+			LOG.info("完成！");
 		}
 
 		/*
